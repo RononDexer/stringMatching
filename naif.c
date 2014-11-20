@@ -244,6 +244,7 @@ void initarbr(struct arbr* a, char* s)
  a->edglabel=malloc((strlen(s)+1)*sizeof(char)); 
  strcpy(a->edglabel, s);
  int k;
+ //a->subtree=(arbr*) malloc(256*sizeof(arbr*));
  for (k=0; k<256; k++)
  {
   a->subtree[k]=NULL;
@@ -254,7 +255,7 @@ void initarbr(struct arbr* a, char* s)
 createSuffTree(int textsize, char* text)
 {
  struct arbr root;
- initarbr(&root, "$");
+ initarbr(&root, "");
  struct arbr* currTree=&root;
  int i,k;
  //loop through all the suffixes
@@ -268,13 +269,15 @@ createSuffTree(int textsize, char* text)
    {
     printf("NULL create new node\n");
     // create new son with label text[i+j:len] and add to the father's childrens at indice "text[i+j]" (first letter of the suffix) 
-    struct arbr newSon;
-    initarbr(&newSon, &text[i+j]);
-    currTree->subtree[text[i+j]]= &newSon;
+    struct arbr* newSon= malloc(sizeof(arbr)); // if not malloc, the memory adress don't change at each turn of the loop
+    initarbr(newSon, &text[i+j]);
+    currTree->subtree[text[i+j]]= newSon;
     printf("put the new node at the letter %c and the ind %d\n",text[i+j],text[i+j]);
     // change j to end while loop
     j=textsize-i;
     printf("print first node (must stay constant) %s\n", root.subtree[text[0]]->edglabel);
+    //aim achieved, don't forget to move back to the root
+    currTree=&root;
    }
    else
    {//we have a matching edge (at least in part) -> we have two possibilities :
@@ -293,15 +296,11 @@ createSuffTree(int textsize, char* text)
      j+=lenEdgLab;
      currTree=currTree->subtree[text[i+j]];
     }
-    else if (lenMatch==lenSuffix)
-    {//option impossible
-     printf("Error, misplaced “$” in text\n");
-    }
     else
     {//option 2 : cut the concerned edge
      printf("cut\n");
      //use library copy functions
-     char strbg[lenMatch];
+     char* strbg=malloc((lenMatch+1)*sizeof(char));
      for (k=0; k<lenMatch; k++)
      {
       strbg[k]=currTree->subtree[text[i+j]]->edglabel[k];
@@ -312,23 +311,29 @@ createSuffTree(int textsize, char* text)
       strend[k]=currTree->subtree[text[i+j]]->edglabel[k+lenMatch];
      }
      //cut current edge and create a new son of current Node
-     struct arbr newSon;
-     initarbr(&newSon, strbg);
+     struct arbr* newSon=malloc(sizeof(arbr));
+     initarbr(newSon, strbg);
      //create a new son of the precedent son
-     struct arbr newGrandson;
-     initarbr(&newGrandson, &text[i+j+lenMatch]);
+     struct arbr* newGrandson = malloc(sizeof(arbr));
+     initarbr(newGrandson, &text[i+j+lenMatch]);
      
      //change edge label of the old son
+     printf("change edge label at %d (corr to %c) by %s\n",text[i+j],text[i+j],strbg);
      currTree->subtree[text[i+j]]->edglabel=strend;
      
      //move old son to the newSon to avoid losing its sons
-     newSon.subtree[strend[0]]=currTree->subtree[text[i+j]];
+     newSon->subtree[strend[0]]=currTree->subtree[text[i+j]];
      //taking care of link father and son
-     newSon.subtree[text[i+j+lenMatch]]=&newGrandson;
-     currTree->subtree[text[i+j]]=&newSon;
-     j+=lenMatch;
-     //don't forget to move in the tree
-     currTree=currTree->subtree[text[i+j]];
+     newSon->subtree[text[i+j+lenMatch]]=newGrandson;
+     currTree->subtree[text[i+j]]=newSon;
+     //j+=lenMatch;
+     
+     //aim achieved, don't forget to move back to the root
+     currTree=&root;
+     j=textsize-i;
+     //currTree=currTree->subtree[text[i+j]];
+     
+     printf("print first node (may have change if cut occurs in it) %s\n", root.subtree[text[0]]->edglabel);
     }
     
     //char* ss = currTree->subtree[text[i+j]]->edglabel;
