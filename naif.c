@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "string.h"
 #include <stdio.h>
 #include "time.h"
@@ -203,9 +204,9 @@ typedef struct arbr arbr;
 struct arbr
 {
  //a pointer to a string which is the label of the father edge (root do not need this)
- char** edglabel;   
+ char* edglabel;   //oui mais besoin d'un deuxième label (celui du noeud)?
  //Pointers toward subtrees. There is at most 256 possible subtrees, depending on the first character of the outcoming edge, which is a byte (this way, multibytes characters are considered as many characters, but we probably don’t care).
- arbr* subtree[256]; 
+ arbr* subtree[256]; //moyen de def juste un pointeur et def la taille plus tard?
  //Is this node a terminal node (equivalent to existence of a son with an edge only labelled $). //pb si on veut label ":" et "$"
  //int isend;
 };
@@ -238,7 +239,10 @@ int strmtch(int l1, int l2, char* s1, char* s2)
 void initarbr(struct arbr* a, char* s)
 {
  //a->isend = 0;
- a->edglabel=&s; 
+// char str[strlen(s)];
+// strcpy(str, s);
+ a->edglabel=malloc((strlen(s)+1)*sizeof(char)); 
+ strcpy(a->edglabel, s);
  int k;
  for (k=0; k<256; k++)
  {
@@ -246,13 +250,13 @@ void initarbr(struct arbr* a, char* s)
  }
 }
 
-//(Trying to) build a suffix tree of the text. TODO:… well, almost everything
+//(Trying to) build a suffix tree of the text. TODO… well, almost everything
 suff(int textsize, char* text)
 {
  //printf("insuff\n");
  struct arbr a;
  int k;
- initarbr(&a, "");
+ initarbr(&a, "$");
  //printf("coucou\n");
  //printf ("%s\n", a.edglabel);
  struct arbr* curr=&a;
@@ -265,25 +269,75 @@ suff(int textsize, char* text)
   //printf("enteringwhileloop\n");
   while (j<textsize-i)
   {
+   printf("%s\n", &text[i+j]);
    //printf("j=%d\n",j);
    if (curr->subtree[text[i+j]]==NULL)
    {
+    printf("NULL\n");
     struct arbr b;
     initarbr(&b, &text[i+j]);
-    printf("%s\n", &text[i+j]);
     //b.isend=1;
     curr->subtree[text[i+j]]= &b;
     j=textsize-i;
    }
    else
    {
+    int rl=textsize-i-j;
+    int el=strlen(curr->subtree[text[i+j]]->edglabel);
+    printf("coucou\n");
+    int lq=strmtch(rl, el, &text[i+j], curr->subtree[text[i+j]]->edglabel);
+    printf("rl=%d, el=%d, lq=%d\n", rl, el, lq);
+    printf("%s\n",curr->subtree[text[i+j]]->edglabel);
+    printf("%c\n", text[i+j]);
+    if (lq==el)
+    {
+     printf("forth\n");
+     j+=el;
+     curr=curr->subtree[text[i+j]];
+    }
+    else if (lq==rl)
+    {
+     printf("Error, misplaced “$” in text\n");
+    }
+    else
+    {
+     printf("cut\n");
+     //use library copy functions
+     char strbg[lq];
+     for (k=0; k<lq; k++)
+     {
+      strbg[k]=curr->subtree[text[i+j]]->edglabel[k];
+     }
+     char* strend=malloc((el-lq+1)*sizeof(char));
+     for (k=0; k<el-lq; k++)
+     {
+      strend[k]=curr->subtree[text[i+j]]->edglabel[k+lq];
+     }
+
+     struct arbr b;
+     initarbr(&b, strbg);
+     struct arbr c;
+     initarbr(&c, &text[i+j+lq]);
+     curr->subtree[text[i+j]]->edglabel=strend;
+     
+     b.subtree[strend[0]]=curr->subtree[text[i+j]];
+     b.subtree[text[i+j+lq]]=&c;
+     curr->subtree[text[i+j]]=&b;
+     j+=lq;
+     curr=curr->subtree[text[i+j]];
+    }
+    
+
+
     //printf("test%d\n", curr->subtree[text[i+j]]);
     //printf("test%d\n", NULL);
-    printf("unimplementedcase\n");
+   // printf("unimplementedcase\n");
     //char* ss = curr->subtree[text[i+j]]->edglabel;
-    printf("%s\n", *curr->subtree[text[i+j]]->edglabel);
-    j++;
+   // printf("%s\n", *curr->subtree[text[i+j]]->edglabel);
+   // j++;
    }
   }
  }
 }
+
+
