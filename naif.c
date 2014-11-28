@@ -35,6 +35,8 @@ int main (int argc, char** argv)
 
  printf("%f, %f, %f\n", d0, d1, d2);  
 
+ //We should add a $ at the end of the text here…
+
  createSuffTree(textsize, argv[2]);
 
  return 1;
@@ -204,7 +206,7 @@ typedef struct arbr arbr;
 struct arbr
 {
  //a pointer to a string which is the label of the father edge (root do not need this)
- char* edglabel;   //oui mais besoin d'un deuxième label (celui du noeud)?
+ unsigned char* edglabel;   //oui mais besoin d'un deuxième label (celui du noeud)?
  //Pointers toward subtrees. There is at most 256 possible subtrees, depending on the first character of the outcoming edge, which is a byte (this way, multibytes characters are considered as many characters, but we probably don’t care).
  arbr* subtree[256]; //moyen de def juste un pointeur et def la taille plus tard?
  //Is this node a terminal node (equivalent to existence of a son with an edge only labelled $). //pb si on veut label ":" et "$"
@@ -213,7 +215,7 @@ struct arbr
 
 
 //up to which point are two strings equals? Useful to know where to insert a new node when constructing the tree.
-int strmtch(int l1, int l2, char* s1, char* s2)
+int strmtch(int l1, int l2, unsigned char* s1, unsigned char* s2)
 {
  if (l1==0||l2==0)
  {
@@ -236,12 +238,12 @@ int strmtch(int l1, int l2, char* s1, char* s2)
 
 //initializing a (already declared) tree of one node, father edge being labelled by second argument
 //TODO: copy the string to set the edge label
-void initarbr(struct arbr* a, char* s)
+void initarbr(struct arbr* a, unsigned char* s)
 {
  //a->isend = 0;
 // char str[strlen(s)];
 // strcpy(str, s);
- a->edglabel=malloc((strlen(s)+1)*sizeof(char)); 
+ a->edglabel=malloc((strlen(s)+1)*sizeof(unsigned char)); 
  strcpy(a->edglabel, s);
  int k;
  //a->subtree=(arbr*) malloc(256*sizeof(arbr*));
@@ -252,7 +254,7 @@ void initarbr(struct arbr* a, char* s)
 }
 
 //(Trying to) build a suffix tree of the text. TODO… well, almost everything
-createSuffTree(int textsize, char* text)
+createSuffTree(int textsize, unsigned char* text)
 {
  struct arbr root;
  initarbr(&root, "");
@@ -323,13 +325,13 @@ createSuffTree(int textsize, char* text)
     {//option 2 : cut the concerned edge
      printf("cut\n");
      //use library copy functions
-     char* strbg=malloc((lenMatch+1)*sizeof(char));
+     unsigned char* strbg=malloc((lenMatch+1)*sizeof(unsigned char));
      strncpy(strbg, currTree->subtree[text[i+j]]->edglabel, lenMatch);
 //     for (k=0; k<lenMatch; k++)
  //    {
   //    strbg[k]=currTree->subtree[text[i+j]]->edglabel[k];
    //  }
-     char* strend=malloc((lenEdgLab-lenMatch+1)*sizeof(char));
+     unsigned char* strend=malloc((lenEdgLab-lenMatch+1)*sizeof(unsigned char));
      strcpy(strend, &currTree->subtree[text[i+j]]->edglabel[lenMatch]);
 //     for (k=0; k<lenEdgLab-lenMatch; k++)
  //    {
