@@ -261,11 +261,20 @@ createSuffTree(int textsize, char* text)
  //loop through all the suffixes
  for (i=0; i<textsize; i++)
  {
+  printf("\nTaking care of %d° suffix : %s (first letter correspond to %d)\n",i+1, &text[i], text[i]);
   int j=0;
   while (j<textsize-i)
   {
-   printf("\nTaking care of %d° suffix : %s (first letter correspond to %d)\n",i+1, &text[i+j], text[i+j]);
-   if (currTree->subtree[text[i+j]]==NULL)
+   printf("\nremains %d° suffix : %s (first letter correspond to %d)\n",j , &text[i+j], text[i+j]);
+   if (currTree==NULL)
+   {
+    printf("Oops, current tree is NULL. This shall not happen!\n");
+    printf("i=%d, j=%d, suffix to match = %s\n", i, j, &text[i+j]);
+    return 1;
+    //j=textsize-1;
+    //currTree=&root;
+   }
+   else if (currTree->subtree[text[i+j]]==NULL)
    {
     printf("NULL create new node\n");
     // create new son with label text[i+j:len] and add to the father's childrens at indice "text[i+j]" (first letter of the suffix) 
@@ -284,33 +293,50 @@ createSuffTree(int textsize, char* text)
     // 1- the edge's label is included in the suffix, so we need to move forward in the tree
     // 2- the suffix is included in the edge's label, so we need to cut the edge
     int lenSuffix=textsize-i-j;
+    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[text[i+j]]);
     int lenEdgLab=strlen(currTree->subtree[text[i+j]]->edglabel);
+    printf("Apparently yes!\n");
     printf("cut or move forward?\n");
     int lenMatch=strmtch(lenSuffix, lenEdgLab, &text[i+j], currTree->subtree[text[i+j]]->edglabel);
     printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenSuffix, lenEdgLab, lenMatch);
     printf("edge label : %s\n",currTree->subtree[text[i+j]]->edglabel);
     printf("edge label must begin by : %c\n", text[i+j]);
-    if (lenMatch==lenEdgLab)
+    if (lenMatch==lenEdgLab&&lenMatch==lenSuffix)
+    {//add the $ and do further suffixes
+     printf("exact match!\n");
+     j+=lenEdgLab;
+     currTree=&root;
+    }
+    else if (lenMatch==lenEdgLab)
     {//option 1 : move forward
      printf("forth\n");
-     j+=lenEdgLab;
+     if (currTree->subtree[text[i+j]]==NULL)
+     {
+      printf("Something went wrong, we are mooving to nowhere!\n");
+      printf("i=%d, j=%d, suffix to match=%s\n", i, j, &text[i+j]);
+      return 1;
+     }
      currTree=currTree->subtree[text[i+j]];
+     j+=lenEdgLab;
     }
     else
     {//option 2 : cut the concerned edge
      printf("cut\n");
      //use library copy functions
      char* strbg=malloc((lenMatch+1)*sizeof(char));
-     for (k=0; k<lenMatch; k++)
-     {
-      strbg[k]=currTree->subtree[text[i+j]]->edglabel[k];
-     }
+     strncpy(strbg, currTree->subtree[text[i+j]]->edglabel, lenMatch);
+//     for (k=0; k<lenMatch; k++)
+ //    {
+  //    strbg[k]=currTree->subtree[text[i+j]]->edglabel[k];
+   //  }
      char* strend=malloc((lenEdgLab-lenMatch+1)*sizeof(char));
-     for (k=0; k<lenEdgLab-lenMatch; k++)
-     {
-      strend[k]=currTree->subtree[text[i+j]]->edglabel[k+lenMatch];
-     }
+     strcpy(strend, &currTree->subtree[text[i+j]]->edglabel[lenMatch]);
+//     for (k=0; k<lenEdgLab-lenMatch; k++)
+ //    {
+  //    strend[k]=currTree->subtree[text[i+j]]->edglabel[k+lenMatch];
+   //  }
      //cut current edge and create a new son of current Node
+     printf("Cutting %s into %s and %s\n", currTree->subtree[text[i+j]]->edglabel, strbg, strend);
      struct arbr* newSon=malloc(sizeof(arbr));
      initarbr(newSon, strbg);
      //create a new son of the precedent son
