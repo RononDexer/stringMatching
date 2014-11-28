@@ -3,6 +3,19 @@
 #include <stdio.h>
 #include "time.h"
 
+typedef struct arbr arbr;
+
+
+struct arbr
+{
+ //a pointer to a string which is the label of the father edge (root do not need this)
+ unsigned char* edglabel;   //oui mais besoin d'un deuxième label (celui du noeud)?
+ //Pointers toward subtrees. There is at most 256 possible subtrees, depending on the first character of the outcoming edge, which is a byte (this way, multibytes characters are considered as many characters, but we probably don’t care).
+ arbr* subtree[256]; //moyen de def juste un pointeur et def la taille plus tard?
+ //Is this node a terminal node (equivalent to existence of a son with an edge only labelled $). //pb si on veut label ":" et "$"
+ //int isend;
+};
+
 
 //first argument given to the program is the pattern, second argument is the text.
 int main (int argc, char** argv)
@@ -36,9 +49,13 @@ int main (int argc, char** argv)
  printf("%f, %f, %f\n", d0, d1, d2);  
 
  //We should add a $ at the end of the text here…
-
- createSuffTree(textsize, argv[2]);
-
+ char* text2= malloc((textsize+1)*(sizeof(char)));
+ strcpy(text2, argv[2]);
+ text2[textsize]='$';
+ struct arbr* tree=malloc(sizeof(arbr));
+ createSuffTree(textsize+1, text2, tree);
+ printf("Launching research of motif %s in the suffix tree of %s$\n",argv[1],argv[2]);
+ matchSuffTree(patsize, argv[1], tree, textsize);
  return 1;
 }
 
@@ -201,17 +218,6 @@ kmp(int patsize, int textsize, char* pat, char* text)
 
 //(Trying to) define a structure of tree in order to build a prefix tree.
 
-typedef struct arbr arbr;
-
-struct arbr
-{
- //a pointer to a string which is the label of the father edge (root do not need this)
- unsigned char* edglabel;   //oui mais besoin d'un deuxième label (celui du noeud)?
- //Pointers toward subtrees. There is at most 256 possible subtrees, depending on the first character of the outcoming edge, which is a byte (this way, multibytes characters are considered as many characters, but we probably don’t care).
- arbr* subtree[256]; //moyen de def juste un pointeur et def la taille plus tard?
- //Is this node a terminal node (equivalent to existence of a son with an edge only labelled $). //pb si on veut label ":" et "$"
- //int isend;
-};
 
 
 //up to which point are two strings equals? Useful to know where to insert a new node when constructing the tree.
@@ -253,12 +259,12 @@ void initarbr(struct arbr* a, unsigned char* s)
  }
 }
 
-//(Trying to) build a suffix tree of the text. TODO… well, almost everything
-createSuffTree(int textsize, unsigned char* text)
+
+int createSuffTree(int textsize, unsigned char* text, arbr* root)
 {
- struct arbr root;
- initarbr(&root, "");
- struct arbr* currTree=&root;
+ //struct arbr root=*rt;
+ initarbr(root, "");
+ struct arbr* currTree=root;
  int i,k;
  //loop through all the suffixes
  for (i=0; i<textsize; i++)
@@ -272,9 +278,9 @@ createSuffTree(int textsize, unsigned char* text)
    {
     printf("Oops, current tree is NULL. This shall not happen!\n");
     printf("i=%d, j=%d, suffix to match = %s\n", i, j, &text[i+j]);
-    return 1;
+    return 0;
     //j=textsize-1;
-    //currTree=&root;
+    //currTree=root;
    }
    else if (currTree->subtree[text[i+j]]==NULL)
    {
@@ -286,9 +292,9 @@ createSuffTree(int textsize, unsigned char* text)
     printf("put the new node at the letter %c and the ind %d\n",text[i+j],text[i+j]);
     // change j to end while loop
     j=textsize-i;
-    printf("print first node (must stay constant) %s\n", root.subtree[text[0]]->edglabel);
+    printf("print first node (must stay constant) %s\n", root->subtree[text[0]]->edglabel);
     //aim achieved, don't forget to move back to the root
-    currTree=&root;
+    currTree=root;
    }
    else
    {//we have a matching edge (at least in part) -> we have two possibilities :
@@ -307,7 +313,7 @@ createSuffTree(int textsize, unsigned char* text)
     {//add the $ and do further suffixes
      printf("exact match!\n");
      j+=lenEdgLab;
-     currTree=&root;
+     currTree=root;
     }
     else if (lenMatch==lenEdgLab)
     {//option 1 : move forward
@@ -316,7 +322,7 @@ createSuffTree(int textsize, unsigned char* text)
      {
       printf("Something went wrong, we are mooving to nowhere!\n");
       printf("i=%d, j=%d, suffix to match=%s\n", i, j, &text[i+j]);
-      return 1;
+      return 0;
      }
      currTree=currTree->subtree[text[i+j]];
      j+=lenEdgLab;
@@ -324,19 +330,10 @@ createSuffTree(int textsize, unsigned char* text)
     else
     {//option 2 : cut the concerned edge
      printf("cut\n");
-     //use library copy functions
      unsigned char* strbg=malloc((lenMatch+1)*sizeof(unsigned char));
      strncpy(strbg, currTree->subtree[text[i+j]]->edglabel, lenMatch);
-//     for (k=0; k<lenMatch; k++)
- //    {
-  //    strbg[k]=currTree->subtree[text[i+j]]->edglabel[k];
-   //  }
      unsigned char* strend=malloc((lenEdgLab-lenMatch+1)*sizeof(unsigned char));
      strcpy(strend, &currTree->subtree[text[i+j]]->edglabel[lenMatch]);
-//     for (k=0; k<lenEdgLab-lenMatch; k++)
- //    {
-  //    strend[k]=currTree->subtree[text[i+j]]->edglabel[k+lenMatch];
-   //  }
      //cut current edge and create a new son of current Node
      printf("Cutting %s into %s and %s\n", currTree->subtree[text[i+j]]->edglabel, strbg, strend);
      struct arbr* newSon=malloc(sizeof(arbr));
@@ -357,11 +354,11 @@ createSuffTree(int textsize, unsigned char* text)
      //j+=lenMatch;
      
      //aim achieved, don't forget to move back to the root
-     currTree=&root;
+     currTree=root;
      j=textsize-i;
      //currTree=currTree->subtree[text[i+j]];
      
-     printf("print first node (may have change if cut occurs in it) %s\n", root.subtree[text[0]]->edglabel);
+     printf("print first node (may have change if cut occurs in it) %s\n", root->subtree[text[0]]->edglabel);
     }
     
     //char* ss = currTree->subtree[text[i+j]]->edglabel;
@@ -369,4 +366,68 @@ createSuffTree(int textsize, unsigned char* text)
    }
   }
  }
+ return 1;
+}
+
+
+matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize)
+{
+ int j=0;
+ arbr* currTree=tree;
+ while (j<patsize)
+  {
+   printf("\nround %d : state of the search : %s (first letter correspond to %d)\n",j , &pattern[j], pattern[j]);
+   if (currTree==NULL)
+   {
+    printf("Oops, current tree is NULL. This shall not happen!\n");
+    printf("j=%d, patternto match = %s\n", j, &pattern[j]);
+    return 1;
+   }
+   else if (currTree->subtree[pattern[j]]==NULL)
+   {
+    printf("Pattern not found (no matching son)\n");
+    return 0;
+   }
+   else
+   {//we have a matching edge (at least in part) -> we have two possibilities :
+    // 1- the edge's label is included in the suffix, so we need to move forward in the tree
+    // 2- the suffix is included in the edge's label, so we need to cut the edge
+    int lenSuffix=patsize-j;
+    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[pattern[j]]);
+    int lenEdgLab=strlen(currTree->subtree[pattern[j]]->edglabel);
+    printf("Apparently yes!\n");
+    printf("stay (final node for the pattern) or move forward?\n");
+    int lenMatch=strmtch(lenSuffix, lenEdgLab, &pattern[j], currTree->subtree[pattern[j]]->edglabel);
+    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenSuffix, lenEdgLab, lenMatch);
+    printf("edge label : %s\n",currTree->subtree[pattern[j]]->edglabel);
+    printf("edge label must begin by : %c\n", pattern[j]);
+    if (lenMatch==lenEdgLab&&lenMatch==lenSuffix)
+    {//add the $ and do further suffixes
+     printf("pattern found\n");
+     return 0;
+    }
+    else if (lenMatch==lenEdgLab)
+    {//option 1 : move forward
+     printf("forth\n");
+     if (currTree->subtree[pattern[j]]==NULL)
+     {
+      printf("Something went wrong, we are mooving to nowhere!\n");
+      printf("j=%d, suffix to match=%s\n", j, &pattern[j]);
+      return 1;
+     }
+     currTree=currTree->subtree[pattern[j]];
+     j+=lenEdgLab;
+    }
+    else if(lenMatch==lenSuffix)
+    {
+     printf("pattern found\n");
+     return 0;
+    }
+    else
+    {
+     printf("pattern not found (edge not fully matching)\n");
+     return 0;
+    }
+   }
+  }
 }
