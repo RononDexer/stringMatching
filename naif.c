@@ -16,6 +16,32 @@ struct arbr
  //int isend;
 };
 
+char *getAlphabet(char* text, int textsize)
+{
+ int i,j;
+ char alphabet[textsize];
+ int alphabetSize=0;
+ for (i=0;i<textsize;i++)
+ {
+  int isAdd=0;
+  for (j=0;j<alphabetSize;j++)
+  {
+   if (text[i]==alphabet[j]) 
+    isAdd=1;
+  }
+  if(!(isAdd))
+  {
+   alphabet[alphabetSize]=text[i];
+   alphabetSize+=1;
+  }
+ }
+ char *alphabet2=malloc(alphabetSize*sizeof(char));//malloc?
+ for (i=0;i<alphabetSize;i++)
+ {
+  alphabet2[i]=alphabet[i];
+ }
+ return alphabet2;
+}
 
 //first argument given to the program is the pattern, second argument is the text.
 int main (int argc, char** argv)
@@ -55,7 +81,13 @@ int main (int argc, char** argv)
  struct arbr* tree=malloc(sizeof(arbr));
  createSuffTree(textsize+1, text2, tree);
  printf("Launching research of motif %s in the suffix tree of %s$\n",argv[1],argv[2]);
- matchSuffTree(patsize, argv[1], tree, textsize);
+ char *alphabet=getAlphabet(text2,textsize+1);
+ int i;
+ printf("\n\nBegin print alphabet\n");
+ for(i=0;alphabet[i];i++){
+     printf("I am the num %d and have the value %d (corresp to char %c)\n",i+1,alphabet[i],alphabet[i]);
+ }
+ matchSuffTree(patsize, argv[1], tree, textsize+1, alphabet);
  return 1;
 }
 
@@ -370,10 +402,10 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
 }
 
 
-matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize)
+matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize, char *alphabet)
 {
  int j=0;
- arbr* currTree=tree;
+ arbr *currTree=tree;
  while (j<patsize)
   {
    printf("\nround %d : state of the search : %s (first letter correspond to %d)\n",j , &pattern[j], pattern[j]);
@@ -392,16 +424,16 @@ matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize)
    {//we have a matching edge (at least in part) -> we have two possibilities :
     // 1- the edge's label is included in the suffix, so we need to move forward in the tree
     // 2- the suffix is included in the edge's label, so we need to cut the edge
-    int lenSuffix=patsize-j;
+    int lenRemainPat=patsize-j;
     printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[pattern[j]]);
     int lenEdgLab=strlen(currTree->subtree[pattern[j]]->edglabel);
     printf("Apparently yes!\n");
     printf("stay (final node for the pattern) or move forward?\n");
-    int lenMatch=strmtch(lenSuffix, lenEdgLab, &pattern[j], currTree->subtree[pattern[j]]->edglabel);
-    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenSuffix, lenEdgLab, lenMatch);
+    int lenMatch=strmtch(lenRemainPat, lenEdgLab, &pattern[j], currTree->subtree[pattern[j]]->edglabel);
+    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenRemainPat, lenEdgLab, lenMatch);
     printf("edge label : %s\n",currTree->subtree[pattern[j]]->edglabel);
     printf("edge label must begin by : %c\n", pattern[j]);
-    if (lenMatch==lenEdgLab&&lenMatch==lenSuffix)
+    if (lenMatch==lenEdgLab&&lenMatch==lenRemainPat)
     {//add the $ and do further suffixes
      printf("pattern found\n");
      return 0;
@@ -412,22 +444,90 @@ matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize)
      if (currTree->subtree[pattern[j]]==NULL)
      {
       printf("Something went wrong, we are mooving to nowhere!\n");
-      printf("j=%d, suffix to match=%s\n", j, &pattern[j]);
+      printf("j=%d, pattern to match=%s\n", j, &pattern[j]);
       return 1;
      }
      currTree=currTree->subtree[pattern[j]];
      j+=lenEdgLab;
     }
-    else if(lenMatch==lenSuffix)
+    else if(lenMatch==lenRemainPat)
     {
-     printf("pattern found\n");
+     printf("pattern found, moving to %s \n",currTree->subtree[pattern[j]]->edglabel);
+     currTree=currTree->subtree[pattern[j]];
+     findPositions(currTree, lenEdgLab-lenMatch, textsize, patsize, alphabet);
      return 0;
     }
     else
     {
-     printf("pattern not found (edge not fully matching)\n");
+     printf("this case must not occurs. Error\n");
      return 0;
     }
    }
   }
+}
+
+int *travelTree(arbr *tree, int *posArray, char *alphabet, int nbCalls)
+{
+ int posArraySize= count(posArray);//(sizeof(posArray) / sizeof(posArray[0])) -1;
+ //if reach a leaf extend posArray
+ if (nbCalls>1)
+  posArray[posArraySize-1]+=strlen(tree->edglabel);
+ printf("progress %s %d\n",tree->edglabel,posArraySize);
+ int i=0;
+ int cptBrEmpty=0;
+ for(i=0;alphabet[i];i++)
+ {
+  printf("Take care of %d (%c)\n",i,alphabet[i]);
+  if (tree->subtree[alphabet[i]]!=NULL)
+  {
+   posArray=travelTree(tree->subtree[alphabet[i]], posArray, alphabet,nbCalls+=1);
+   posArraySize= count(posArray);//sizeof(posArray) / sizeof(posArray[0]) -1;
+   printf("%d\n", posArraySize);
+  }
+  else
+  {
+   cptBrEmpty+=1;
+  }
+ }
+ if (cptBrEmpty==i)
+ {
+  printf("I reach a leaf %s\n",tree->edglabel);
+  posArray=realloc( posArray, (posArraySize+1)*sizeof(int) );
+  posArray[posArraySize]=posArray[posArraySize-1];
+  posArraySize+=1;
+ }
+ posArray[posArraySize-1] -= strlen(tree->edglabel);
+ if (nbCalls==1)
+ {
+  int *posArrayFin=malloc((posArraySize-1)*sizeof(int));
+  for(i=0;i<posArraySize-1;i++)
+      posArrayFin[i]=posArray[i];
+  free(posArray);
+  return posArrayFin;
+ }
+ return posArray;
+}
+
+int findPositions(arbr *tree, int lenNotMatching,int textsize,int patsize, char *alphabet)
+{
+ //By counting the leafs at the end of the current tree we have the number of positions
+ //To have matching positions we need to reach all the leafs which represents the end of the text
+ //We need to sum the lengths of all the nodes to a leaf to have the end position of one match
+ int *posArray= malloc( 1*sizeof(int) );
+ printf("lenNotMatching : %d\n",lenNotMatching);
+ posArray[0]=lenNotMatching;
+ posArray=travelTree(tree, posArray,alphabet,1);
+ int i;
+ for(i=0;posArray[i];i++){
+  posArray[i]=textsize - posArray[i];
+  printf("pattern occcurs from %d to %d\n",posArray[i]-patsize,posArray[i]);
+ }
+ printf("%d occurence(s) found\n",i);
+}
+
+int count(int *tab)
+{
+ int i;
+ for (i = 0; tab[i]; i++){;}
+ return i;
 }
