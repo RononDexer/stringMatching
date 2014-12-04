@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include "string.h"
 #include <stdio.h>
-#include "time.h"
+//#define _POSIX_C_SOURCE >= 199309L
+#include <sys/time.h>
+
 
 typedef struct arbr arbr;
 
@@ -19,7 +21,7 @@ struct arbr
 char *getAlphabet(char* text, int textsize)
 {
  int i,j;
- char alphabet[textsize];
+ unsigned char alphabet[textsize];
  int alphabetSize=0;
  for (i=0;i<textsize;i++)
  {
@@ -35,7 +37,7 @@ char *getAlphabet(char* text, int textsize)
    alphabetSize+=1;
   }
  }
- char *alphabet2=malloc(alphabetSize*sizeof(char));//malloc?
+ unsigned char *alphabet2=malloc(alphabetSize*sizeof(unsigned char));//malloc?
  for (i=0;i<alphabetSize;i++)
  {
   alphabet2[i]=alphabet[i];
@@ -53,24 +55,25 @@ int main (int argc, char** argv)
  }
  int patsize = strlen(argv[1]);
  int textsize = strlen(argv[2]);
- time_t t0, t1, t2, t3;
+ 
+ struct timespec t0, t1, t2, t3;
  double d0, d1, d2;
 
  printf("Trying naive approach\n");
- t0 = time(&t0);
+// clock_gettime(CLOCK_REALTIME, &t0);
  naif(patsize, textsize, argv[1], argv[2]);
  printf("Trying RKM approach\n");
- t1 = time(&t1);
- rkm(4, 29, patsize, textsize, argv[1], argv[2]);
+// clock_gettime(CLOCK_REALTIME, &t1);
+ rkm(256, 1027, patsize, textsize, argv[1], argv[2]);
  printf("Trying KMP approach\n");
- t2 = time(&t2);
+// clock_gettime(CLOCK_REALTIME, &t2);
  kmp(patsize, textsize, argv[1], argv[2]);
- t3 = time(&t3);
+// clock_gettime(CLOCK_REALTIME, &t3);
 
  //this is supposed to be the time taken by each of these approaches. Until now, always outputs 0
- d0 = difftime(t1, t0);
- d1 = difftime(t2, t1);
- d2 = difftime(t3, t2);
+ d0 = ((double)t1.tv_sec+1.0e-9*t1.tv_nsec)-((double)t0.tv_sec+1.0e-9*t0.tv_nsec);
+ d1 = ((double)t2.tv_sec+1.0e-9*t2.tv_nsec)-((double)t1.tv_sec+1.0e-9*t1.tv_nsec);
+ d2 = ((double)t3.tv_sec+1.0e-9*t3.tv_nsec)-((double)t2.tv_sec+1.0e-9*t2.tv_nsec);
 
  printf("%f, %f, %f\n", d0, d1, d2);  
 
@@ -80,13 +83,13 @@ int main (int argc, char** argv)
  text2[textsize]='$';
  struct arbr* tree=malloc(sizeof(arbr));
  createSuffTree(textsize+1, text2, tree);
- printf("Launching research of motif %s in the suffix tree of %s$\n",argv[1],argv[2]);
+// printf("Launching research of motif %s in the suffix tree of %s$\n",argv[1],argv[2]);
  char *alphabet=getAlphabet(text2,textsize+1);
  int i;
- printf("\n\nBegin print alphabet\n");
- for(i=0;alphabet[i];i++){
-     printf("I am the num %d and have the value %d (corresp to char %c)\n",i+1,alphabet[i],alphabet[i]);
- }
+// printf("\n\nBegin print alphabet\n");
+// for(i=0;alphabet[i];i++){
+//     printf("I am the num %d and have the value %d (corresp to char %c)\n",i+1,alphabet[i],alphabet[i]);
+// }
  matchSuffTree(patsize, argv[1], tree, textsize+1, alphabet);
  return 1;
 }
@@ -133,7 +136,7 @@ int naif(int patsize, int textsize, char* pat, char* text)
   }
   if (j==patsize)
   {
-   printf("found pattern at index %d\n", i);
+   printf("found pattern at shift %d\n", i);
    ret=1;
   }
  }
@@ -163,7 +166,7 @@ int nnaif(int patsize, int shift, char* pat, char* text)
 
 //RKM matcher. First argument is the size of the alphabet, second argument is the modulo used.
 //The value of each character is always the corresponding byte (e.g. 'A'≡108, 'C'≡110, 'G'≡114, 'T'≡127, 'U'≡128), whatever the size of the alphabet given in argument.
-int rkm(int alpsize, int mod, int patsize, int textsize, char* pat, char* text)
+int rkm(int alpsize, int mod, int patsize, int textsize, unsigned char* pat, unsigned char* text)
 {
  int h = powmod(alpsize, patsize-1, mod); //réélement besoin de cette fonction?
  int i;
@@ -301,11 +304,11 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
  //loop through all the suffixes
  for (i=0; i<textsize; i++)
  {
-  printf("\nTaking care of %d° suffix : %s (first letter correspond to %d)\n",i+1, &text[i], text[i]);
+//  printf("\nTaking care of %d° suffix : %s (first letter correspond to %d)\n",i+1, &text[i], text[i]);
   int j=0;
   while (j<textsize-i)
   {
-   printf("\nremains %d° suffix : %s (first letter correspond to %d)\n",j , &text[i+j], text[i+j]);
+//   printf("\nremains %d° suffix : %s (first letter correspond to %d)\n",j , &text[i+j], text[i+j]);
    if (currTree==NULL)
    {
     printf("Oops, current tree is NULL. This shall not happen!\n");
@@ -316,15 +319,15 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
    }
    else if (currTree->subtree[text[i+j]]==NULL)
    {
-    printf("NULL create new node\n");
+//    printf("NULL create new node\n");
     // create new son with label text[i+j:len] and add to the father's childrens at indice "text[i+j]" (first letter of the suffix) 
     struct arbr* newSon= malloc(sizeof(arbr)); // if not malloc, the memory adress don't change at each turn of the loop
     initarbr(newSon, &text[i+j]);
     currTree->subtree[text[i+j]]= newSon;
-    printf("put the new node at the letter %c and the ind %d\n",text[i+j],text[i+j]);
+//    printf("put the new node at the letter %c and the ind %d\n",text[i+j],text[i+j]);
     // change j to end while loop
     j=textsize-i;
-    printf("print first node (must stay constant) %s\n", root->subtree[text[0]]->edglabel);
+//    printf("print first node (must stay constant) %s\n", root->subtree[text[0]]->edglabel);
     //aim achieved, don't forget to move back to the root
     currTree=root;
    }
@@ -333,23 +336,23 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
     // 1- the edge's label is included in the suffix, so we need to move forward in the tree
     // 2- the suffix is included in the edge's label, so we need to cut the edge
     int lenSuffix=textsize-i-j;
-    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[text[i+j]]);
+//    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[text[i+j]]);
     int lenEdgLab=strlen(currTree->subtree[text[i+j]]->edglabel);
-    printf("Apparently yes!\n");
-    printf("cut or move forward?\n");
+//    printf("Apparently yes!\n");
+//    printf("cut or move forward?\n");
     int lenMatch=strmtch(lenSuffix, lenEdgLab, &text[i+j], currTree->subtree[text[i+j]]->edglabel);
-    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenSuffix, lenEdgLab, lenMatch);
-    printf("edge label : %s\n",currTree->subtree[text[i+j]]->edglabel);
-    printf("edge label must begin by : %c\n", text[i+j]);
+//    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenSuffix, lenEdgLab, lenMatch);
+//    printf("edge label : %s\n",currTree->subtree[text[i+j]]->edglabel);
+//    printf("edge label must begin by : %c\n", text[i+j]);
     if (lenMatch==lenEdgLab&&lenMatch==lenSuffix)
     {//add the $ and do further suffixes
-     printf("exact match!\n");
+//     printf("exact match!\n");
      j+=lenEdgLab;
      currTree=root;
     }
     else if (lenMatch==lenEdgLab)
     {//option 1 : move forward
-     printf("forth\n");
+//     printf("forth\n");
      if (currTree->subtree[text[i+j]]==NULL)
      {
       printf("Something went wrong, we are mooving to nowhere!\n");
@@ -361,13 +364,13 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
     }
     else
     {//option 2 : cut the concerned edge
-     printf("cut\n");
+//     printf("cut\n");
      unsigned char* strbg=malloc((lenMatch+1)*sizeof(unsigned char));
      strncpy(strbg, currTree->subtree[text[i+j]]->edglabel, lenMatch);
      unsigned char* strend=malloc((lenEdgLab-lenMatch+1)*sizeof(unsigned char));
      strcpy(strend, &currTree->subtree[text[i+j]]->edglabel[lenMatch]);
      //cut current edge and create a new son of current Node
-     printf("Cutting %s into %s and %s\n", currTree->subtree[text[i+j]]->edglabel, strbg, strend);
+//     printf("Cutting %s into %s and %s\n", currTree->subtree[text[i+j]]->edglabel, strbg, strend);
      struct arbr* newSon=malloc(sizeof(arbr));
      initarbr(newSon, strbg);
      //create a new son of the precedent son
@@ -375,7 +378,7 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
      initarbr(newGrandson, &text[i+j+lenMatch]);
      
      //change edge label of the old son
-     printf("change edge label at %d (corr to %c) by %s\n",text[i+j],text[i+j],strbg);
+//     printf("change edge label at %d (corr to %c) by %s\n",text[i+j],text[i+j],strbg);
      currTree->subtree[text[i+j]]->edglabel=strend;
      
      //move old son to the newSon to avoid losing its sons
@@ -390,7 +393,7 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
      j=textsize-i;
      //currTree=currTree->subtree[text[i+j]];
      
-     printf("print first node (may have change if cut occurs in it) %s\n", root->subtree[text[0]]->edglabel);
+//     printf("print first node (may have change if cut occurs in it) %s\n", root->subtree[text[0]]->edglabel);
     }
     
     //char* ss = currTree->subtree[text[i+j]]->edglabel;
@@ -402,13 +405,13 @@ int createSuffTree(int textsize, unsigned char* text, arbr* root)
 }
 
 
-matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize, char *alphabet)
+matchSuffTree(int patsize, unsigned char *pattern, arbr *tree, int textsize, char *alphabet)
 {
  int j=0;
  arbr *currTree=tree;
  while (j<patsize)
   {
-   printf("\nround %d : state of the search : %s (first letter correspond to %d)\n",j , &pattern[j], pattern[j]);
+//   printf("\nround %d : state of the search : %s (first letter correspond to %d)\n",j , &pattern[j], pattern[j]);
    if (currTree==NULL)
    {
     printf("Oops, current tree is NULL. This shall not happen!\n");
@@ -425,22 +428,23 @@ matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize, char *alphab
     // 1- the edge's label is included in the suffix, so we need to move forward in the tree
     // 2- the suffix is included in the edge's label, so we need to cut the edge
     int lenRemainPat=patsize-j;
-    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[pattern[j]]);
+//    printf("There is a subtree %p, … but does it have an edglabel?\n", &currTree->subtree[pattern[j]]);
     int lenEdgLab=strlen(currTree->subtree[pattern[j]]->edglabel);
-    printf("Apparently yes!\n");
-    printf("stay (final node for the pattern) or move forward?\n");
+//    printf("Apparently yes!\n");
+//    printf("stay (final node for the pattern) or move forward?\n");
     int lenMatch=strmtch(lenRemainPat, lenEdgLab, &pattern[j], currTree->subtree[pattern[j]]->edglabel);
-    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenRemainPat, lenEdgLab, lenMatch);
-    printf("edge label : %s\n",currTree->subtree[pattern[j]]->edglabel);
-    printf("edge label must begin by : %c\n", pattern[j]);
+//    printf("lenSuffix(rl)=%d, lenEdgLab(el)=%d, lenMatch(lq)=%d\n", lenRemainPat, lenEdgLab, lenMatch);
+//    printf("edge label : %s\n",currTree->subtree[pattern[j]]->edglabel);
+//    printf("edge label must begin by : %c\n", pattern[j]);
     if (lenMatch==lenEdgLab&&lenMatch==lenRemainPat)
-    {//add the $ and do further suffixes
-     printf("pattern found\n");
+    {
+//     printf("pattern found\n");
+     findPositions(currTree->subtree[pattern[j]], 0, textsize, patsize, alphabet);
      return 0;
     }
     else if (lenMatch==lenEdgLab)
     {//option 1 : move forward
-     printf("forth\n");
+//     printf("forth\n");
      if (currTree->subtree[pattern[j]]==NULL)
      {
       printf("Something went wrong, we are mooving to nowhere!\n");
@@ -452,54 +456,58 @@ matchSuffTree(int patsize, char *pattern, arbr *tree, int textsize, char *alphab
     }
     else if(lenMatch==lenRemainPat)
     {
-     printf("pattern found, moving to %s \n",currTree->subtree[pattern[j]]->edglabel);
+//     printf("pattern found, moving to %s \n",currTree->subtree[pattern[j]]->edglabel);
      currTree=currTree->subtree[pattern[j]];
      findPositions(currTree, lenEdgLab-lenMatch, textsize, patsize, alphabet);
      return 0;
     }
     else
     {
-     printf("this case must not occurs. Error\n");
+     printf("Pattern not found\n");
      return 0;
     }
    }
   }
 }
 
-int *travelTree(arbr *tree, int *posArray, char *alphabet, int nbCalls)
+int *travelTree(arbr *tree, int *posArray, unsigned char *alphabet, int nbCalls, int posArraySize)
 {
- int posArraySize= count(posArray);//(sizeof(posArray) / sizeof(posArray[0])) -1;
+ //int posArraySize= count(posArray);//(sizeof(posArray) / sizeof(posArray[0])) -1;
  //if reach a leaf extend posArray
  if (nbCalls>1)
   posArray[posArraySize-1]+=strlen(tree->edglabel);
- printf("progress %s %d\n",tree->edglabel,posArraySize);
+// printf("progress %s %d\n",tree->edglabel,posArraySize);
  int i=0;
+ int bool=0;
  int cptBrEmpty=0;
- for(i=0;alphabet[i];i++)
+ for(i=0;alphabet[i];i++)//Do not work with the null character! …null character is the string termination in C. It cannot work with it aniway…
  {
-  printf("Take care of %d (%c)\n",i,alphabet[i]);
+//  printf("Take care of %d (%c)\n",i,alphabet[i]);
   if (tree->subtree[alphabet[i]]!=NULL)
   {
-   posArray=travelTree(tree->subtree[alphabet[i]], posArray, alphabet,nbCalls+=1);
-   posArraySize= count(posArray);//sizeof(posArray) / sizeof(posArray[0]) -1;
-   printf("%d\n", posArraySize);
+   bool=1;
+   posArray=travelTree(tree->subtree[alphabet[i]], posArray, alphabet,nbCalls+1, posArraySize);
+   posArraySize= posArray[0];//sizeof(posArray) / sizeof(posArray[0]) -1;
+//   printf("%d\n", posArraySize);
   }
   else
   {
+//   printf("…it is null\n");
    cptBrEmpty+=1;
   }
  }
- if (cptBrEmpty==i)
+ if (bool==0)
  {
-  printf("I reach a leaf %s\n",tree->edglabel);
+//  printf("I reach a leaf %s\n",tree->edglabel);
   posArray=realloc( posArray, (posArraySize+1)*sizeof(int) );
   posArray[posArraySize]=posArray[posArraySize-1];
   posArraySize+=1;
+  posArray[0]=posArraySize;
  }
  posArray[posArraySize-1] -= strlen(tree->edglabel);
  if (nbCalls==1)
- {
-  int *posArrayFin=malloc((posArraySize-1)*sizeof(int));
+{
+ int *posArrayFin=malloc((posArraySize-1)*sizeof(int));
   for(i=0;i<posArraySize-1;i++)
       posArrayFin[i]=posArray[i];
   free(posArray);
@@ -513,21 +521,16 @@ int findPositions(arbr *tree, int lenNotMatching,int textsize,int patsize, char 
  //By counting the leafs at the end of the current tree we have the number of positions
  //To have matching positions we need to reach all the leafs which represents the end of the text
  //We need to sum the lengths of all the nodes to a leaf to have the end position of one match
- int *posArray= malloc( 1*sizeof(int) );
- printf("lenNotMatching : %d\n",lenNotMatching);
- posArray[0]=lenNotMatching;
- posArray=travelTree(tree, posArray,alphabet,1);
+ int *posArray= malloc( 2*sizeof(int) );
+// printf("lenNotMatching : %d\n",lenNotMatching);
+ posArray[0]=2;
+ posArray[1]=lenNotMatching;
+ posArray=travelTree(tree, posArray,alphabet,1, 2);
  int i;
- for(i=0;posArray[i];i++){
+ for(i=1;i<posArray[0]-1;i++){
   posArray[i]=textsize - posArray[i];
-  printf("pattern occcurs from %d to %d\n",posArray[i]-patsize,posArray[i]);
+  printf("pattern found at index %d to %d\n", posArray[i]-patsize,posArray[i]);
  }
- printf("%d occurence(s) found\n",i);
+ printf("%d occurence(s) found\n",posArray[0]-2);
 }
 
-int count(int *tab)
-{
- int i;
- for (i = 0; tab[i]; i++){;}
- return i;
-}
